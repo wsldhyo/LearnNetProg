@@ -1,6 +1,7 @@
 #include "tcp_client.hpp"
 #include "common.hpp"
 #include <arpa/inet.h>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -10,7 +11,7 @@
 #include <unistd.h>
 
 TcpClient::TcpClient(std::string ip, uint16_t port)
-    : sock_(-1), ip_(std::move(ip)), port_(port), msg_{0} {
+    : sock_(-1), ip_(std::move(ip)), port_(port) {
   connect_server();
 }
 
@@ -20,16 +21,18 @@ TcpClient::~TcpClient() {
 }
 
 void TcpClient::connect_server() {
+  // 创建 TCP 套接字
   sock_ = socket(PF_INET, SOCK_STREAM, 0);
   if (sock_ == -1) {
 
     error_handling("failed to create socket\n");
   }
+  // 填充服务器地址
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = inet_addr(ip_.c_str());
   addr.sin_port = htons(port_);
-
+  // 发起 TCP 连接请求 
   if (connect(sock_, (sockaddr *)&addr, sizeof(addr)) == -1) {
     error_handling("failed to connect server\n");
   } else {
@@ -38,32 +41,55 @@ void TcpClient::connect_server() {
 }
 
 void TcpClient::run() {
-
+  char msg[BUF_SIZE]{};
   while (true) {
     std::cout << "Input message(Q to quit): ";
+    // 读取用户输入
+    fgets(msg, sizeof(msg), stdin);
 
-    fgets(msg_, sizeof(msg_), stdin);
-
-    if (!strcmp(msg_, "q\n") || !strcmp(msg_, "Q\n"))
+    if (!strcmp(msg, "q\n") || !strcmp(msg, "Q\n"))
       break;
-
-    uint32_t send_len = send_msg();
-    recv_msg(send_len);
-    std::cout << "msg_ from server: " << msg_;
+    // 发送给服务器
+    size_t msg_len = strlen(msg);
+    send_msg(msg, msg_len);
+    // 原样读取
+    recv_msg(msg, msg_len);
+    std::cout << "msg from server: " << msg;
   }
 }
 
-int32_t TcpClient::send_msg() { return write(sock_, msg_, strlen(msg_)); }
+void TcpClient::send_msg(char const *msg, size_t const len) {
 
-void TcpClient::recv_msg(uint32_t const send_len) {
-  uint32_t recv_len{0};
-  int32_t cur_recv_len{0};
-  while (recv_len < send_len) {
-    cur_recv_len += read(sock_, msg_, sizeof(msg_) - 1);
-    if (cur_recv_len == -1) {
-      error_handling("read msg from server error!\n");
-    }
-    recv_len += cur_recv_len;
+  size_t total = 0;
+
+  // write() 可能一次无法发送全部数据，因此循环发送
+  while (total < len) {
+    ssize_t n = write(sock_, msg + total, len - total);
+
+    if (n <= 0)
+      error_handling("write");
+
+    total += n;
   }
-  msg_[send_len] = '\0';
+}
+
+void TcpClient::recv_msg(char *msg, size_t const len) {
+  size_t total = 0;
+  // 按照发送长度接收完整消息，read()可能无法一次完全读取，使用循环读取
+  while (total < len) {
+    ssize_t n = read(sock_, msg + total, len - total);
+
+    if (n == 0) { // read 返回 0，表示对端关闭连接
+      std::cout << "server closed\n";
+      exit(1);
+    }
+
+    if (n < 0) {
+      error_handling("read");
+    }
+
+    total += static_cast<size_t>(n);
+  }
+
+  msg[total] = '\0';
 }
