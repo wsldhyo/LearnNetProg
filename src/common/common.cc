@@ -73,6 +73,6 @@ bool is_vaild_port(int32_t port){
 }
 
 void error_handling(const char *msg) {
-  std::cout << msg << "errno:" << errno << '\n';
+  std::cout << msg << " errno:" << errno << '\n';
   exit(-1);
 }
