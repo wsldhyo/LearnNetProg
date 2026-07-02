@@ -47,8 +47,9 @@ void TcpClient::run() {
     // 读取用户输入
     fgets(msg, sizeof(msg), stdin);
 
-    if (!strcmp(msg, "q\n") || !strcmp(msg, "Q\n"))
+    if (!strcmp(msg, "q\n") || !strcmp(msg, "Q\n")){
       break;
+    }
     // 发送给服务器
     size_t msg_len = strlen(msg);
     send_msg(msg, msg_len);
@@ -56,6 +57,14 @@ void TcpClient::run() {
     recv_msg(msg, msg_len);
     std::cout << "msg from server: " << msg;
   }
+  
+  
+  // 通知服务端关闭链接
+  shutdown(sock_, SHUT_WR);
+
+  // 接收滞留在网络中的数据 
+  // 一般很少
+  recv_msg(msg, BUF_SIZE);
 }
 
 void TcpClient::send_msg(char const *msg, size_t const len) {

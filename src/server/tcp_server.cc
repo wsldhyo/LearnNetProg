@@ -81,10 +81,13 @@ void TcpServer::handle_req(int32_t clnt_sock) {
   char msg[BUF_SIZE]{};
 
   while ((msg_len = read(clnt_sock, msg, BUF_SIZE)) > 0) {
+    if (msg_len == 0) {
+      std::cout << "client closed connection\n";
+      break;
+    }
+    if (msg_len < 0) {
+      error_handling("read");
+    }
     write(clnt_sock, msg, msg_len);
-  }
-
-  if (msg_len < 0) {
-    error_handling("read");
   }
 }
